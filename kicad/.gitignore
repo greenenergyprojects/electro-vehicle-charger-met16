@@ -1,0 +1,35 @@
+# For PCBs designed using KiCad: http://www.kicad-pcb.org/
+
+# Temporary files
+*.000
+*.bak
+*.bck
+*.kicad_pcb-bak
+*~
+_autosave-*
+*.tmp
+
+# Netlist files (exported from Eeschema)
+*.net
+
+# Autorouter files (exported from Pcbnew)
+*.dsn
+*.ses
+
+# Exported BOM files
+*.xml
+*.csv
+
+# Exported Gerber files zips
+**/plots
+/ev-charger-met16/software/ev-charger-met16/build/
+/ev-charger-met16/software/ev-charger-met16/dist/
+
+# software
+**/software/**/nbproject
+**/software/**/.dep.inc
+**/software/**/build
+**/software/**/dist
+
+# calc
+**/.~lock*.ods#

@@ -1,0 +1,9 @@
+EESchema-DOCLIB  Version 2.0
+#
+$CMP AD822
+D Single-Supply, Rail-to-Rail, Low Power FET-Input Op AmpD, IP-8/SOIC-8
+K dual opamp
+F http://www.analog.com/media/en/technical-documentation/data-sheets/AD822.pdf
+$ENDCMP
+#
+#End Doc Library
