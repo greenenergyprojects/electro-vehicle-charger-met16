@@ -1,4 +1,4 @@
-update=So 27 Mai 2018 17:58:28 CEST
+update=So 05 Aug 2018 16:25:25 CEST
 version=1
 last_client=kicad
 [pcbnew]
@@ -23,6 +23,8 @@ ModuleOutlineThickness=0.150000000000
 [cvpcb]
 version=1
 NetIExt=net
+[general]
+version=1
 [eeschema]
 version=1
 LibDir=
@@ -59,6 +61,7 @@ LibName29=opto
 LibName30=atmel
 LibName31=contrib
 LibName32=valves
+LibName33=/work/sx/kicad/library/sx-relais
 [schematic_editor]
 version=1
 PageLayoutDescrFile=
@@ -69,5 +72,3 @@ NetFmtName=Pcbnew
 SpiceForceRefPrefix=0
 SpiceUseNetNumbers=0
 LabSize=60
-[general]
-version=1

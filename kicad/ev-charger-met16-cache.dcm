@@ -6,4 +6,9 @@ K dual opamp
 F http://www.analog.com/media/en/technical-documentation/data-sheets/AD822.pdf
 $ENDCMP
 #
+$CMP Omron_G5RL-1-E
+D Relay, monostable, 250VAC/16A, coil 5V/63Ohm
+K relay monastable
+$ENDCMP
+#
 #End Doc Library
