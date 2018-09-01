@@ -47,24 +47,27 @@ void app_main (void)
     app_calcRms(&app.adc.current);
     app_calcRms(&app.adc.voltage);
     
-    if (!sys_isSw2On()) {
-        sys_enablePWM(0);
-        OCR0A = 0;
-        app.maxAmps = 0;
-        app.evStatus = APP_EVSTATUS_OFF;
+    if (sys_isSw2On()) {
+        // sys_enablePWM(0);
+        // OCR0A = 0;
+        sys_enablePWM(1);
+        app.maxAmps = 14;
+        app.evStatus = APP_EVSTATUS_LOADING;
+        OCR0A = app.pwmOn ? ((app.maxAmps * 255) / 6 + 5) / 10 : 255;
     } else {
         sys_enablePWM(1);
+        app.pwmOn = 1;
         switch (sys_getSw1Value()) {
-            case 7:  app.maxAmps =  7; break;
-            case 8:  app.maxAmps =  8; break;
-            case 9:  app.maxAmps =  9; break;
-            case 0:  app.maxAmps = 10; break;
-            case 1:  app.maxAmps = 11; break;
-            case 2:  app.maxAmps = 12; break;
-            case 3:  app.maxAmps = 13; break;
-            case 4:  app.maxAmps = 14; break;
-            case 5:  app.maxAmps = 15; break;
-            case 6:  app.maxAmps = 16; break;
+            case 7:  app.maxAmps =  8; break;
+            case 8:  app.maxAmps =  9; break;
+            case 9:  app.maxAmps = 10; break;
+            case 0:  app.maxAmps = 11; break;
+            case 1:  app.maxAmps = 12; break;
+            case 2:  app.maxAmps = 13; break;
+            case 3:  app.maxAmps = 14; break;
+            case 4:  app.maxAmps = 15; break;
+            case 5:  app.maxAmps = 16; break;
+            case 6:  app.maxAmps = 17; break;
             default: app.maxAmps = 0; break;
         }
         if (app.vcpX16 >= 10 * 16) { // VCP >= 10V

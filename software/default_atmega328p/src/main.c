@@ -56,7 +56,7 @@ int main (void)
   if (sys.lcd.status==1)
   {
     printf("detected and ready to use\n");
-    sys_lcd_putString("EVC V1.0 - ");
+    sys_lcd_putString("EVC V1.1 - ");
     sys_lcd_putString(__TIME__);
   }
   else
