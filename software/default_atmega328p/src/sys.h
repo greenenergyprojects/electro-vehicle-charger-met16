@@ -137,11 +137,13 @@ void    sys_lcd_putString         (const char * str);
 #ifdef ARDUINO
 //void    sys_setNanoLed                (uint8_t ledState);
 //void    sys_toggleNanoLed             (void);
-void    sys_setLedD2              (uint8_t ledState);
-void    sys_toggleLedD2           (void);
+//void    sys_setLedD2              (uint8_t ledState);
+//void    sys_toggleLedD2           (void);
+void    sys_setK1                 (uint8_t on);
+void    sys_setK2                 (uint8_t on);
 void    sys_setLedD3              (uint8_t ledState);
 void    sys_toggleLedD3           (void);
-int     sys_isSw2On               (void);
+//int     sys_isSw2On               (void);
 int     sys_getSw1Value           (void);
 
 #endif

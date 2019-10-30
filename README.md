@@ -10,16 +10,16 @@
 
 ## History
 
-### Version v0.2: First prototype
+### Version v0.3: Second prototype
 
 ----------------------------------------------
  Topic          | Description
  :----          | :-----------
- Commit/Tag     | v0.2
- Date           | 2018-08-02
- Status         | Prototype finished
+ Commit/Tag     | v0.3
+ Date           | 2019-10-30
+ Status         | Under Test
  Manufactured   | Yes
- Tested         | Yes
+ Tested         | No
  Print          | [kicad/README.md](kicad/README.md)
  Software       | [software/default_atmega328p/README.md](software/default_atmega328p/README.md)
 

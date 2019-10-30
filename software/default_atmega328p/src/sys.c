@@ -107,8 +107,8 @@ void sys_init (void)
   // Timer for ADC
   TCCR1A = 0;
   TCCR1B = (1 << WGM12) | (1 << CS10); // CTC, f = 16MHz
-  OCR1A = 1600; // CTC -> 60us (960)
-  OCR1B = 1600; // ADC Trigger -> 60us (960)
+  OCR1A = 1600; // CTC -> 100us (1600)
+  OCR1B = 1600; // ADC Trigger -> 100us (1600)
   TIMSK1 = (1 << OCIE1B);
   
   // Timer for 1kHz control pilot signal
@@ -137,11 +137,11 @@ void sys_init (void)
   stdin  = &mystdin;
   
   // settings for ev-charger-met
-  DDRC |= (1 << PC3) | (1 << PC4); // LED D3 (PC3) and D2 (PC4)
-  DDRC &= ~(1 << PC5); // SW2 (on/off)
-  PORTC |= (1 << PC5);
-  DDRD &= ~(0x3c); // SW1 (rotary switch 0-9)
-  PORTD |= 0x3c;
+  DDRC |= (1 << PC3); // LED D3 (PC3) - Life LED (green)
+  DDRC |= (1 << PC4); // LED D7 - K1 relais (LED blue)
+  DDRC |= (1 << PC5); // LED D2 - K2 SSR relais (LED red)
+  DDRD &= ~(0x3c); // SW1 (rotary switch 0-9) PD2/PD3/PD4/PD5
+  PORTD |= 0x3c;   // pull up on rotary switch
   
   // ADC: ADC0=Current 0A..16A, ADC1=230V Voltage, 
   //      ADC2=-12V, ADC6=Voltage CP, ADC7=+12V
@@ -749,6 +749,25 @@ void sys_toggleNanoLed (void) {
 }
 */
 
+void sys_setK1 (uint8_t on) {
+    DDRC |= (1 << PC4); // PC4 - K1 (Relais 230V/16A)
+    if (on) {
+        PORTC |= (1 << PC4);
+    } else {
+        PORTC &= ~(1 << PC4);
+    }
+}
+
+void sys_setK2 (uint8_t on) {
+    DDRC |= (1 << PC5); // PC5 - K2 (Fotek SSR 100A)
+    if (on) {
+        PORTC |= (1 << PC5);
+    } else {
+        PORTC &= ~(1 << PC5);
+    }
+}
+
+
 void sys_setLedD3 (uint8_t ledState) {
     if (ledState)
         PORTC |= (1 << PC3);
@@ -760,6 +779,7 @@ void sys_toggleLedD3 (void) {
     PORTC ^= (1 << PC3);
 }
 
+/*
 void sys_setLedD2 (uint8_t ledState) {
     if (ledState)
         PORTC |= (1<<PC4);
@@ -774,6 +794,7 @@ void sys_toggleLedD2 (void) {
 int sys_isSw2On () {
     return (PINC & (1 << PC5)) != 0;
 }
+*/
 
 int sys_getSw1Value () {
     return 15 - ((PIND >> 2) & 0x0f);

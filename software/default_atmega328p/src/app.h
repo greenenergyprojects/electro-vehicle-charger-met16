@@ -2,6 +2,9 @@
 #define APP_H_INCLUDED
 
 // declarations
+
+enum APP_STATE { Init, Test, Start, NotConnected, Connected, EVReady, Charging };
+
 struct App_TrimParams {
   uint8_t vcpK, vcpD;
 };
@@ -20,41 +23,80 @@ struct App_AdcRms {
     uint8_t  zeroAdcRange; // range of ADC which results in zero rms (avoid wrong value caused by noise)
 };
 
+struct App_ADC_MEAS_UPLO {
+    uint8_t  accCnt;
+    uint16_t accValue;
+    uint32_t accQuadValue;
+    uint8_t  cnt;
+    uint16_t value;
+    uint32_t quadValue;
+};
+
+struct App_ADC_MEAS {
+    uint8_t thValue;
+    uint8_t thWidth;
+    uint8_t upperCurv;
+    struct App_ADC_MEAS_UPLO upper;
+    struct App_ADC_MEAS_UPLO lower;
+};
+
+struct App_ADC_VOLT {
+    uint8_t upperCurv;
+    int8_t  thCnt;
+    uint8_t thValue;
+    uint8_t cntUpper;
+    uint8_t cntLower;
+    uint32_t accVoltage;
+};
+
+struct App_ADC_FREQU {
+    uint8_t period;
+    uint16_t periodEwma;
+};
+
 struct App_ADC {
     uint8_t cnt;
     uint8_t adc0, adc1, adc2, adc6, adc7;
-    struct App_AdcRms current, voltage;
+    struct App_ADC_MEAS  voltage;
+    struct App_ADC_MEAS  current;
+    struct App_ADC_VOLT  volt;
+    struct App_ADC_FREQU frequ;
+    uint16_t voltX256;
+    uint16_t currX256;
+    uint16_t activePowerX256;
+    uint32_t energyX256;
+    
+    // struct App_AdcRms current, voltage;
 };
+
 
 struct App {
     uint32_t cnt;
+    enum APP_STATE state;
     struct App_TrimParams trim;
     struct App_ADC adc;
+    uint16_t frequX256;
     uint8_t maxAmps;
     uint8_t vcpX16; // in volt, comma between bit 4 and 3
-    uint8_t evStatus;
-    uint8_t pwmOn;
     uint8_t disableStatusLED;
     uint32_t debug[3];
+    uint8_t smTimer;
+    int32_t energy;       // accumulatete energy in Wh
 };
 
 extern struct App app;
 
 // defines
 
-#define APP_EVSTATUS_OFF          0
-#define APP_EVSTATUS_NOTCONNECTED 1
-#define APP_EVSTATUS_CONNECTED    2
-#define APP_EVSTATUS_LOADING      3
 
-#define APP_EVENT_REFRESH_LCD   0x01
-#define APP_EVENT_1   0x02
-#define APP_EVENT_2   0x04
-#define APP_EVENT_3   0x08
-#define APP_EVENT_4   0x10
-#define APP_EVENT_5   0x20
-#define APP_EVENT_6   0x40
-#define APP_EVENT_7   0x80
+#define APP_EVENT_REFRESH_LCD    0x01
+#define APP_EVENT_CALC_FREQU     0x02
+#define APP_EVENT_CALC_VOLT_UPP  0x04
+#define APP_EVENT_CALC_VOLT_LOW  0x08
+#define APP_EVENT_CALC_CURR_UPP  0x10
+#define APP_EVENT_CALC_CURR_LOW  0x20
+#define APP_EVENT_POW_UPP        0x40
+#define APP_EVENT_POW_LOW        0x80
 
 
 // functions
