@@ -1,0 +1,22 @@
+{
+    "files.associations": {
+        "global.h": "c",
+        "stdio.h": "c",
+        "io.h": "c",
+        "cctype": "cpp",
+        "cmath": "cpp",
+        "cstdint": "cpp",
+        "cstdio": "cpp",
+        "cstdlib": "cpp",
+        "limits": "cpp",
+        "*.tcc": "cpp",
+        "cinttypes": "cpp",
+        "type_traits": "cpp",
+        "typeinfo": "cpp"
+    },
+    "cpplint": {
+        "lineLength": 140,
+        "root": "src",
+        "filters": [ "-whitespace/parens", "-whitespace/blank_line", "-readability/casting", "-legal/copyright", "-build/include" ]
+    }
+}

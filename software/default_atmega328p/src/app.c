@@ -120,7 +120,7 @@ uint16_t app_ewmaPeriod (uint8_t value) {
     } else {
         // s = k*a*value + (1-1/a)*s -> k=128, a=1/64, s(t>>tau)=k*value -> tau=256ms(@dt=4ms), s=25600(@f=50Hz)
         s = s - (s >> 6);           // s = 0..64512 (0xfc00), real 0..64007 (0xfa07)
-        s += (uint16_t)value * 2;   // s = 0..65022 (0xfdfe), real 0..64517 (0xfc05)
+        s += (uint16_t)value * 4;   // s = 0..65022 (0xfdfe), real 0..64517 (0xfc05)
     }
     return s;
 }

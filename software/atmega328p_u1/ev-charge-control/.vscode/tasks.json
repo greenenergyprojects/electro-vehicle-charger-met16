@@ -1,0 +1,36 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "build",
+            "type": "shell",
+            "command": "make",
+            "args": []
+        },
+        {
+            "label": "clean",
+            "type": "shell",
+            "command": "make",
+            "args": [
+                "clean"
+            ]
+        },
+        {
+            "label": "Easyprogrammer",
+            "type": "process",
+            "command": "/usr/bin/easyprogrammer",
+            "args": [
+                "--target",
+                "atmega324p",
+                "--interface",
+                "/dev/ttyUSB0:115200",
+                "-f",
+                "dist/atmega324p.hex"
+            ],
+            "isBackground": true,
+            "problemMatcher": []
+        }
+    ]
+}

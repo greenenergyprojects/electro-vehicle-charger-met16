@@ -1,0 +1,29 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "/usr/lib/avr/include/stdio.h",
+                "/usr/lib/avr/include/**",
+                "/usr/lib/gcc/avr/**",
+                "${workspaceFolder}/src/**"
+            ],
+            "defines": [ "__AVR_ATmega324P__" ],
+            "forcedInclude": [ "/usr/share/avr/include/stdio.h" ],
+            "compilerPath": "/usr/bin/avr-gcc",
+            "cStandard": "c11",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "clang-x64",
+            "intelliSenseEngine": "default",
+            "browse": {
+                "path": [
+                    "${workspaceFolder}"
+                ],
+                "limitSymbolsToIncludedHeaders": true,
+                "databaseFilename": ""
+            }
+
+        }
+    ],
+    "version": 4
+}
