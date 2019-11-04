@@ -928,6 +928,72 @@ namespace u1_sys {
     // Application functions
     // ****************************************************************************
 
+    // x=0..200 (0..360°) => sin(x) * 256 (with error: -0,52% ... 0,63%)
+    int16_t sinX256 (uint8_t x) {
+        // while (x < 0) {
+        //     x += 200;
+        // }
+        while (x > 200) {
+            x -= 200;
+        }
+
+        if (x >= 173) {
+            return -sinX256(200 - x);
+        } else if (x >= 150) {
+            return -cosX256(x - 150);
+        } else if (x >= 128) {
+            return -cosX256(150 - x);
+        } else if (x >= 100) {
+            return -sinX256(x - 100);
+        } else if (x >= 73) {
+            return sinX256(100 - x);
+        } else if ( x >= 50) {
+            return cosX256(x - 50);
+        } else if (x > 27) {
+            return cosX256(50 - x);
+        }
+
+        // sin(x)= x - x³/6
+        uint16_t a = x * x ;                 // 0 .. 729
+        uint16_t b = 86 * a;                 // 0 .. 62694
+        uint16_t c = 2048 - (b + 128) / 256; // 2048 .. 1804
+        uint32_t d = x * c;                  // 0 .. 55296
+        uint16_t e = (uint16_t)d;
+        e = e + 64 + x * 16;
+        return (uint8_t)(e >> 8);
+    }
+    
+    // x=0..200 (0..360°) => cos(x) * 256 (with error: -0,53% ... 0,63%)
+    int16_t cosX256 (uint8_t x) {
+        // while (x < 0) {
+        //     x += 200;
+        // }
+        while (x > 200) {
+            x -= 200;
+        }
+        if (x >= 178) {
+            return cosX256(200 - x);
+        } else if (x >= 150) {
+            return sinX256(x - 150);
+        } else if (x >= 123) {
+            return -sinX256(150 - x);
+        } else if (x >= 100) {
+            return -cosX256(x - 100);
+        } else if (x >= 78) {
+            return -cosX256(100 - x);
+        } else if ( x >= 50) {
+            return -sinX256(x - 50);
+        } else if (x > 22) {
+            return sinX256(50 - x);
+        }
+        
+        // cos(x)= 1 - x²/2
+        uint16_t a = x * x + 4 ;     // 0 .. 488
+        uint16_t b = 256 - a / 8;    // 0 .. 134
+        b = b + (x > 16 ? 1 : 0);
+        return b;
+    }
+
     void enablePWM (uint8_t enable) {
         if (enable) {
             if (TCCR0A == 0) {

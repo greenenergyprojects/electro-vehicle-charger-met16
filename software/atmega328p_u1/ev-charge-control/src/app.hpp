@@ -15,57 +15,86 @@
 namespace u1_app {
 
     #define EVENT_REFRESH_LCD    0x01
-    #define EVENT_CALC_FREQU     0x02
-    #define EVENT_CALC_VOLT_UPP  0x04
-    #define EVENT_CALC_VOLT_LOW  0x08
-    #define EVENT_CALC_CURR_UPP  0x10
-    #define EVENT_CALC_CURR_LOW  0x20
-    #define EVENT_POW_UPP        0x40
-    #define EVENT_POW_LOW        0x80
+    #define EVENT_1              0x02
+    #define EVENT_2              0x04
+    #define EVENT_3              0x08
+    #define EVENT_4              0x10
+    #define EVENT_5              0x20
+    #define EVENT_6              0x40
+    #define EVENT_7              0x80
 
     enum State { Init, Test, Start, NotConnected, Connected, EVReady, Charging };
 
+    struct Trim {
+        uint8_t vcpK, vcpD;
+        int8_t  tempK, tempOffs;
+    };
+
+
     union Debug {
+        int8_t s8[12];
+        int16_t s16[6];
+        int32_t s32[3];
         uint8_t u8[12];
         uint16_t u16[6];
         uint32_t u32[3];
     };
 
-    struct AdcSine {
-        uint8_t tmpMin, tmpMax, tmpTimer;
+    struct AdcSineTmp {
         int8_t  area;        // =0 -> not known, =1 -> positive half, =-1 -> negative half
-        uint8_t th;          // adc threshhold value between positive and negative half
-        uint8_t min, max;    // adc min and max value of current period
-        uint8_t peakToPeak;  // adc peak to peak value (=0 -> not detected)
+        uint8_t min;
+        uint8_t max;
+        uint8_t valueAt150;
+        uint8_t valueAt210;
+        uint8_t timer;       // number of 200us counts since phase angle == 0
+    };
+
+    struct AdcSine {
+        uint8_t  th;          // adc threshhold value between positive and negative half
+        uint8_t  min, max;    // adc min and max value of current period
+        uint16_t peakToPeak;  // adc peak to peak value (=0 -> not detected)
     };
     
     struct AdcVoltage {
+        uint16_t timer;
         int8_t  area;        // =0 -> not known, =1 -> positive half, =-1 -> negative half
         uint8_t th;          // adc threshhold value between positive and negative half
         uint8_t min, max;    // adc min and max value of current period
+        uint8_t hMin, hMx;   // adc values on sine(30)=0.5*max and sine(-30)=0.5*min
         uint8_t period;      // 0x64 = 100 -> 50Hz
         uint16_t periodEwma; // 0x3200 = 12600 -> 50Hz (ewma filtered value)
         uint8_t peakToPeak;
     };
 
     struct AdcCurrent {
-        struct AdcSine adcSine;
+        struct AdcSineTmp tmp;
+        struct AdcSine    sine;
+        uint8_t simAdcK;     // =0 take adc from sensor, >0 take voltage adc*simAdcK/32;
     };
+
 
     struct Adc {
         uint8_t cnt;
-        uint8_t adc0, adc1;
+        uint8_t adc0, adc1, adc2, adc6, adc7, adc8;
         uint8_t recentAdc1[16];
         uint8_t recentAdc1Index;
-        uint8_t phAngX100us;
+        int16_t phAngX100us;
         struct AdcVoltage voltage;
         struct AdcCurrent current;
     };
 
+    struct Clock {
+        uint16_t ms;
+        uint8_t  sec;
+        uint8_t  min;
+        uint8_t  hrs;
+    };
 
     struct App {
         enum State state;
+        struct Clock clock;
         union Debug debug;
+        struct Trim trim;
         struct Adc adc;
         uint8_t disableStatusLED;
         uint8_t maxAmps;
@@ -73,6 +102,11 @@ namespace u1_app {
         uint16_t frequX256;
         uint16_t vphX256;
         uint16_t currX256;
+        int16_t apparantPower;
+        int16_t activePower;
+        int16_t reactivePower;
+        uint8_t ovrTempProt;
+        int8_t  temp;
         uint16_t energy;
     };
 

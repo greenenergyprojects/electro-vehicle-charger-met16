@@ -113,23 +113,52 @@ namespace u1_mon {
         }
         
         switch (lineIndex) {
-            case 0: printf("L1 | A0 A1 A2 A6 A7 | Volt | Amps |   VCP | SW1 | STATUS "); return 60;
+            case 0: printf("L1 | A0 A1 A2 A6 A7 A8 | Temp | STATUS "); return 60;
             case 1: printf("L2 | Voltage\n   | +/- TH ADC MIN MAX VPP |  PERIOD |  FREQU |    VAC | "); return 60;
-            case 2: printf("L3 | Current\n   | +/- TH ADC MIN MAX IPP |"); return 60;
-            case 3: printf("L4 | Debug"); return 60;
+            case 2: printf("L3 | Current\n   | +/- TH ADC MIN MAX IPP | DPH | SIM |  CURR"); return 60;
+            case 3: printf("L4 | Power\n   |  FREQU |    VAC |  CURR | DPH |      S |      P |        Q |"); return 70;
             default: return -1; // this line index is not valid
         }
     }
 
     int8_t printLine (uint8_t lineIndex, char keyPressed) {
+        
+        // handle keypressed
+        switch (lineIndex) {
+            case 2: case 3: {
+                uint8_t k = u1_app::app.adc.current.simAdcK;
+                if (keyPressed == 's') {
+                    if (k == 0) {
+                        // enable current simulation
+                        // current adc taken from voltage sensor
+                        k = 32;
+                    } else {
+                        // disable current simulation
+                        // current adc taken from current sensor
+                        k = 0;
+                    }
+                }
+                if (k > 0) {
+                    // adjust current adc simulation amplitude
+                    if (keyPressed =='+') {
+                        k = (k < 0xff) ? k + 1 : k;
+                    } else if (keyPressed == '-') {
+                        k = (k < 0xff) ? k - 1 : k;
+                    }
+                }
+                u1_app::app.adc.current.simAdcK = k;
+                break;
+            }
+        }
+
+        // create line output
+        printf("%02d | ", (int)u1_sys::getSw1Value());
         switch (lineIndex) {
             case 0: {
-                printf("%02d |", (int)u1_sys::getSw1Value());
-                struct u1_app::AdcVoltage *p = &(u1_app::app.adc.voltage);
-                printf("%2d %02x %02x %02x %02x | ", p->area, p->th, p->min, p->max, p->period);
-                uint16_t frequX256 = u1_app::app.frequX256;
-                printf(" %2u.%1uHz |", frequX256 / 256, ((frequX256 & 0xff) * 10) / 256);
-
+                struct u1_app::Adc *p = &(u1_app::app.adc);
+                printf("%02x %02x %02x %02x %02x %02x ", p->adc0, p->adc1, p->adc2, p->adc6, p->adc7, p->adc8);
+                printf("| %3dC ", (int)u1_app::app.temp);
+                printf("| "); 
                 switch (u1_app::app.state) {
                     case u1_app::Init:         printf("Init"); break;
                     case u1_app::Test:         printf("Test"); break;
@@ -145,7 +174,7 @@ namespace u1_mon {
             
             case 1: {
                 struct u1_app::AdcVoltage *p = &(u1_app::app.adc.voltage);
-                printf("   | %3d %02x  %02x  %02x  %02x  %02x ", p->area, p->th, u1_app::app.adc.adc1, p->min, p->max, p->peakToPeak);
+                printf("%3d %02x  %02x  %02x  %02x  %02x ", p->area, p->th, u1_app::app.adc.adc1, p->min, p->max, p->peakToPeak);
                 printf("| %02x %04x ", p->period, p->periodEwma);
                 uint16_t frequX256 = u1_app::app.frequX256 + 13; // 0.05*256 = 12.8 -> 13
                 printf("| %2u.%1uHz ", frequX256 / 256, ((frequX256 & 0xff) * 10) / 256);
@@ -155,15 +184,35 @@ namespace u1_mon {
             }
             
             case 2: {
-                struct u1_app::AdcSine *p = &(u1_app::app.adc.current.adcSine);
-                printf("   | %3d %02x  %02x  %02x  %02x  %02x ", p->area, p->th, u1_app::app.adc.adc0, p->min, p->max, p->peakToPeak);
-                printf("| %02x ", u1_app::app.adc.phAngX100us);
+                struct u1_app::AdcSine *p = &(u1_app::app.adc.current.sine);
+                
+                printf("%3d %02x  %02x  %02x  %02x %03x ", u1_app::app.adc.current.tmp.area, p->th, u1_app::app.adc.adc0, p->min, p->max, p->peakToPeak);
+                printf("| %3d ", u1_app::app.adc.phAngX100us);
+                printf("| %3d ", u1_app::app.adc.current.simAdcK);
                 uint16_t currX256 = u1_app::app.currX256 + 13; // 0.05*256 = 12.8 -> 13
-                printf("| %3u.%1uA ", currX256 / 256, ((currX256 & 0xff) * 10) / 256);
+                printf("| %2u.%1uA ", currX256 / 256, ((currX256 & 0xff) * 10) / 256);                
                 return 4;
             }
         
             case 3: {
+                struct u1_app::AdcVoltage *pv = &(u1_app::app.adc.voltage);
+                struct u1_app::AdcSine *pc = &(u1_app::app.adc.current.sine);
+                uint16_t frequX256 = u1_app::app.frequX256 + 13; // 0.05*256 = 12.8 -> 13
+                printf("%2u.%1uHz ", frequX256 / 256, ((frequX256 & 0xff) * 10) / 256);
+                uint16_t vphX256 = u1_app::app.vphX256 + 13; // 0.05*256 = 12.8 -> 13
+                printf("| %3u.%1uV ", vphX256 / 256, ((vphX256 & 0xff) * 10) / 256);
+                uint16_t currX256 = u1_app::app.currX256 + 13; // 0.05*256 = 12.8 -> 13
+                printf("| %2u.%1uA ", currX256 / 256, ((currX256 & 0xff) * 10) / 256);
+                printf("| %3d ", u1_app::app.adc.phAngX100us);
+                
+                cli();
+                int16_t s = u1_app::app.apparantPower;
+                int16_t p = u1_app::app.activePower;
+                int16_t q = u1_app::app.reactivePower;
+                sei();
+                printf("| %4dVA ", s); 
+                printf("| %5dW ", p); 
+                printf("| %5dvar ", q);
                 return 2;
             }
         

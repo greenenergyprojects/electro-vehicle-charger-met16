@@ -164,6 +164,8 @@ namespace u1_sys {
         void lcd_putString (const char * str);
     #endif
 
+    int16_t cosX256 (uint8_t x);
+    int16_t sinX256 (uint8_t x);
     void enablePWM (uint8_t enable);
     void setK1 (uint8_t on);
     void setK2 (uint8_t on);
