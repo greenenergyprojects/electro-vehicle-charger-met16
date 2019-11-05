@@ -107,7 +107,7 @@ namespace u1_app {
         int16_t reactivePower;
         uint8_t ovrTempProt;
         int8_t  temp;
-        uint16_t energy;
+        uint32_t energyKwhX256;
     };
 
 

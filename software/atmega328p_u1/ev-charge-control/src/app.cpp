@@ -143,8 +143,12 @@ namespace u1_app {
             }
             
             case 2: {
-                div_t d = div((int)app.energy, 1000);
-                snprintf(s, sizeof(s), "%d.%02dkWh", d.quot, d.rem / 10);
+                // div_t d = div((int)app.energy, 1000);
+                // snprintf(s, sizeof(s), "%d.%02dkWh", d.quot, d.rem / 10);
+                cli();
+                uint32_t e = app.energyKwhX256;
+                sei();
+                snprintf(s, sizeof(s), "%ld.%02dkWh", e / 256, ((uint8_t)e * 100 / 256));
                 break;
             }
             
@@ -753,16 +757,30 @@ namespace u1_app {
     uint8_t handleADCValue_adc100us (uint8_t channel, uint8_t result) {
         static int16_t phAngX100us = 0;
         static uint8_t timerChannel2 = 0;
-        uint8_t nextChannel;
+        static int32_t accEnergy = 0;
+        
 
         if (app.adc.voltage.timer < 512) {
+            // used for period/frequency measurement
+            // must be increased every 100us
             app.adc.voltage.timer++;
+        }
+
+        // 1kWh = 256 -> 1000W * 3600s * 200 (calls/period) * 50Hz = 36.000.000.000
+        //          1 -> 36.000.000.000 / 256 = 140.625.000 (hex 0861 c468)
+        accEnergy = accEnergy + app.activePower - 140625000L;
+        if (accEnergy < 0) {
+            accEnergy = accEnergy + 140625000L;
+        } else {
+            app.energyKwhX256 += 1;
         }
 
         if ( (phAngX100us >= 0) && (phAngX100us < 127) ) {
             phAngX100us++;
         }
         app.adc.cnt++;
+        
+        uint8_t nextChannel;
         switch (channel) {
             case 0: { // current 
                 nextChannel = 1;

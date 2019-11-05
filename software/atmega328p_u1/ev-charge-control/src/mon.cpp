@@ -209,10 +209,13 @@ namespace u1_mon {
                 int16_t s = u1_app::app.apparantPower;
                 int16_t p = u1_app::app.activePower;
                 int16_t q = u1_app::app.reactivePower;
+                uint32_t e = u1_app::app.energyKwhX256;
                 sei();
+
                 printf("| %4dVA ", s); 
                 printf("| %5dW ", p); 
                 printf("| %5dvar ", q);
+                printf("| %ld.%02dkWh", e / 256, ((uint8_t)e) * 100 / 256);
                 return 2;
             }
         
