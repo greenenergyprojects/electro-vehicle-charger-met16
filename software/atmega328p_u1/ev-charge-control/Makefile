@@ -18,13 +18,13 @@ dist/atmega328p_u1.elf: build/main.o build/sys.o build/mon.o build/app.o
 build/main.o: src/main.cpp src/global.h src/sys.hpp src/app.hpp
 	avr-g++ -o $@ -mmcu=atmega328p -Os -c -DCOMPILE $<
 
-build/sys.o: src/sys.cpp src/global.h src/sys.hpp
+build/sys.o: src/sys.cpp src/global.h src/mon.hpp src/app.hpp src/sys.hpp
 	avr-g++ -o $@ -mmcu=atmega328p -Os -c -DCOMPILE $<
 
-build/mon.o: src/mon.cpp src/global.h src/sys.hpp src/mon.hpp
+build/mon.o: src/mon.cpp src/global.h src/global.h src/mon.hpp src/app.hpp src/sys.hpp
 	avr-g++ -o $@ -mmcu=atmega328p -Os -c -DCOMPILE $<
 
-build/app.o: src/app.cpp src/global.h src/app.hpp src/sys.hpp src/mon.hpp
+build/app.o: src/app.cpp src/global.h src/global.h src/mon.hpp src/app.hpp src/sys.hpp
 	avr-g++ -o $@ -mmcu=atmega328p -Os -c -DCOMPILE $<
 
 u1: dist/atmega328p_u1.hex

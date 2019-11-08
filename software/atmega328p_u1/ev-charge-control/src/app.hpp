@@ -25,9 +25,17 @@ namespace u1_app {
 
     enum State { Init, Test, Start, NotConnected, Connected, EVReady, Charging };
 
+
+    // ***********************************************************************
+
     struct Trim {
-        uint8_t vcpK, vcpD;
-        int8_t  tempK, tempOffs;
+        uint32_t magic;
+        uint16_t startCnt; // only 15 bits used -> log record
+        uint8_t  vcpK;
+        uint8_t  vcpD;
+        uint8_t  currK;
+        int8_t   tempK;
+        int8_t   tempOffs;
     };
 
 
@@ -69,7 +77,7 @@ namespace u1_app {
     struct AdcCurrent {
         struct AdcSineTmp tmp;
         struct AdcSine    sine;
-        uint8_t simAdcK;     // =0 take adc from sensor, >0 take voltage adc*simAdcK/32;
+        // uint8_t simAdcK;     // =0 take adc from sensor, >0 take voltage adc*simAdcK/32;
     };
 
 
@@ -90,8 +98,17 @@ namespace u1_app {
         uint8_t  hrs;
     };
 
+    struct Sim {
+        uint8_t currentAdcK; // =0 take current adc from sensor, >0 take voltage adc*simAdcK/32;
+        int f;
+        int v;
+        int i; 
+        int t;
+    };
+
     struct App {
         enum State state;
+        struct Sim sim;
         struct Clock clock;
         union Debug debug;
         struct Trim trim;
@@ -105,15 +122,17 @@ namespace u1_app {
         int16_t apparantPower;
         int16_t activePower;
         int16_t reactivePower;
-        uint8_t ovrTempProt;
+        uint8_t protection;
         int8_t  temp;
         uint32_t energyKwhX256;
+        uint32_t chgTimeSeconds;
     };
 
 
     extern struct App app;
 
     void init ();
+    void initTrim (uint8_t startup);
     void main ();
 
     void task_1ms   ();

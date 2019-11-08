@@ -1,5 +1,6 @@
 #include "global.h"
 #include "sys.hpp"
+#include "mon.hpp"
 #include "app.hpp"
 
 #include <string.h>
@@ -15,11 +16,40 @@ namespace u1_app {
 
     void init () {
         memset(&app, 0, sizeof app);
-        app.trim.vcpK = 13; app.trim.vcpD = 0;
-        app.trim.tempK = 64; app.trim.tempOffs = 0x58;
+        initTrim(1);
+        // u1_mon::clearTrim();
+        // u1_mon::clearLogTable();
         app.state = Init;
-        app.adc.current.simAdcK = 0;
+        app.protection = '-'; // no protection active
         DDRD |= (1 << PD6); // PWM output
+    }
+
+    void initTrim (uint8_t startup) {
+        if (startup) {
+            struct Trim t;
+            eeprom_busy_wait();
+            eeprom_read_block(&t, 0, sizeof t);
+            if (t.magic == 0x00030201) {
+                app.trim = t;
+                app.trim.startCnt++;
+                if (app.trim.startCnt > 0x7fff) {
+                    u1_mon::clearLogTable();
+                    app.trim.startCnt = 1;
+                }
+                eeprom_write_word((uint16_t *)4, app.trim.startCnt);
+                eeprom_busy_wait();
+                if (app.trim.vcpK < 8) { // bug??
+                    app.trim.vcpK = 13;
+
+                }
+                return;
+            }
+        }
+        app.trim.magic = 0x00030201;
+        app.trim.startCnt = 1;
+        app.trim.vcpK = 13; app.trim.vcpD = 0;
+        app.trim.currK = 149;
+        app.trim.tempK = 64; app.trim.tempOffs = 0x58;
     }
 
     void main () {
@@ -96,7 +126,8 @@ namespace u1_app {
         char s[21];    
         u1_sys::lcd_setCursorPosition(0, 0);
         {
-            snprintf(s, sizeof(s), "%d|%2dA%c|%2dC|", u1_sys::getSw1Value(), app.maxAmps, app.ovrTempProt ? 'P' : ' ', app.temp);
+            
+            snprintf(s, sizeof(s), "%d|%2dA|%c|%2dC|", u1_sys::getSw1Value(), app.maxAmps, app.protection, app.temp);
             u1_sys::lcd_putString(s);
             uint8_t len = strlen(s);    
             switch (app.state) {
@@ -110,7 +141,7 @@ namespace u1_app {
                 default:           snprintf(s, sizeof(s), "?"); break;
             }
             
-            for (uint8_t i = 0; i < len - strlen(s) - 2; i++) {
+            for (uint8_t i = 0; i < 20 - len - strlen(s); i++) {
                 u1_sys::lcd_putchar(' ');
             }
             u1_sys::lcd_putString(s);   
@@ -123,6 +154,7 @@ namespace u1_app {
         snprintf(s, sizeof(s), "%2d.%1dA ", (currX256 / 256), ((currX256 & 0xff) * 10) / 256);
         u1_sys::lcd_putString(s);   
         timer = timer < 15 ? timer + 1 : 0;
+        int8_t size = 14;
         switch (timer / 4) {
             case 0: {
                 struct u1_app::AdcVoltage *p = &(u1_app::app.adc.voltage);
@@ -153,12 +185,30 @@ namespace u1_app {
             }
             
             case 3: {
+                char sim[6] = "-----";
+                if (app.sim.currentAdcK > 0) {
+                    sim[0] = 'S';
+                }
+                if (app.sim.f > 0) {
+                    sim[1] = 'f';
+                }
+                if (app.sim.v > 0) {
+                    sim[2] = 'v';
+                }
+                if (app.sim.t > 0) {
+                    sim[3] = 't';
+                }
+                if (app.sim.i > 0) {
+                    sim[4] = 'i';
+                }
+                u1_sys::lcd_putString(sim);
+                size = size - 5;
                 snprintf(s, sizeof(s), "%d:%02d:%02d", app.clock.hrs, app.clock.min, app.clock.sec);
                 break;
             }
 
         }
-        for (uint8_t i = 0; i < 14 -strlen(s); i++) {
+        for (uint8_t i = 0; i < size - strlen(s); i++) {
             u1_sys::lcd_putchar(' ');
         }
         u1_sys::lcd_putString(s);   
@@ -206,6 +256,7 @@ namespace u1_app {
         return s;
     }
 
+    // value 0 .. 511 (>255 in case of Ipeak > 20A)
     uint16_t calcCurrentAmplitudeEwma_4ms (uint16_t value) {
         static uint16_t s = 0; // =0A
         if (value == 0) {
@@ -215,12 +266,11 @@ namespace u1_app {
         } else {
             // adc-peakpeak= 94 -> s = k * a * 94 = 1536 -> 1536/256 = 6A 
             // s = k*a*value + (1-1/a)*s -> k=0.2553, a=1/64, s(t>>tau)=k*value -> tau=256ms(@dt=4ms)
-            s = s - (s >> 4); // s = 0..61440 (0xf000)
-            if (value <= 488) {
-                s += ((uint16_t)value * 132) / 126;  // s = 0..???? (0x????);
-            } else {
-                s += 255;
+            s = s - (s >> 4); // s = 0..61439 (0xefff)
+            if (value > 511) {
+                value = 511;
             }
+            s += ((uint16_t)value * app.trim.currK) / 128;  // s = 0..62461 (0xf3fd);
         }
         return s;
     }
@@ -276,13 +326,22 @@ namespace u1_app {
         if (dt > 0) {
             int8_t maxAmps = 17 - dt / 2;
             app.maxAmps = maxAmps >= 8 ? maxAmps : 0;
-            app.ovrTempProt = 1;
-        } else {
-            app.ovrTempProt = 0;
+            if (app.protection == '-') {
+                app.protection = 'T';
+            }
+        } else if (app.protection == 'T') {
+            app.protection = '-';
+        }
+        if (app.protection == 'F') {
+            app.maxAmps =  0;
+
         }
 
-
         uint8_t pwmOC = ((app.maxAmps * 255) / 6 + 5) / 10;
+        if (pwmOC < 13) {
+            pwmOC = 13; // 5% duty cyle
+        }
+        
         app.disableStatusLED = 0;
         
         switch (nextState) {
@@ -379,6 +438,7 @@ namespace u1_app {
                     if (timer == 0) {
                         u1_sys::setK1(1);
                         timer =  500;
+                        app.chgTimeSeconds = 0;
                         nextState = Charging;
                     }
                 } else {
@@ -391,6 +451,12 @@ namespace u1_app {
             }
             
             case Charging: {
+                static uint16_t timerChgSeconds = 0;
+                timerChgSeconds++;
+                if (timerChgSeconds >= 1000) {
+                    timerChgSeconds = 0;
+                    app.chgTimeSeconds = (app.chgTimeSeconds < 0xffff) ? app.chgTimeSeconds + 1 : 0xffff;
+                }
                 u1_sys::enablePWM(1);
                 OCR0A = pwmOC;
                 if (app.vcpX16 >= (100 * 16 / 10)) { // 10.5V
@@ -437,18 +503,36 @@ namespace u1_app {
         
         valueEwma = calcVoltagePeriodEwma_4ms(app.adc.voltage.period);
         app.adc.voltage.periodEwma = valueEwma;
+        uint16_t frequX256;
         if (valueEwma == 0) {
-            app.frequX256 = 0;
+            frequX256 = 0;
         } else {
             int32_t diff_i32 = (int32_t)valueEwma - 25600;
             int8_t d_i8 = (diff_i32 < -128) ? -128 : ( (diff_i32 > 127) ? 127 : (int8_t)diff_i32 );
-            app.frequX256 = 0x3200 - (d_i8 / 2); // 0x32 --> 50Hz
+            frequX256 = 0x3200 - (d_i8 / 2); // 0x32 --> 50Hz
         }
+        if (app.sim.f > 0) {
+            frequX256 =  app.sim.f * 256;
+        }
+        if (frequX256 > (50 * 256 + 128) || frequX256 < (50 * 256 - 128)) {
+            app.protection = 'F';
+        } else {
+            if (app.protection == 'F') {
+                app.protection = '-';
+            }
+        }
+        app.frequX256 =  frequX256;
 
         valueEwma = calcVoltageAmplitudeEwma_4ms(app.adc.voltage.peakToPeak);
+        if (app.sim.v > 0) {
+            valueEwma = app.sim.v * 256; 
+        }
         app.vphX256 = valueEwma;
 
         valueEwma = calcCurrentAmplitudeEwma_4ms(app.adc.current.sine.peakToPeak);
+        if (app.sim.i > 0) {
+            valueEwma = app.sim.i * 256;
+        }
         app.currX256 = valueEwma;
 
         calcPower();
@@ -784,8 +868,8 @@ namespace u1_app {
         switch (channel) {
             case 0: { // current 
                 nextChannel = 1;
-                if (app.adc.current.simAdcK > 0) {
-                    int16_t x = ( ( (int16_t)(app.adc.recentAdc1[(app.adc.recentAdc1Index + 1) % 16]) ) - 0x5c ) * app.adc.current.simAdcK / 32 + 0x80;
+                if (app.sim.currentAdcK > 0) {
+                    int16_t x = ( ( (int16_t)(app.adc.recentAdc1[(app.adc.recentAdc1Index + 1) % 16]) ) - 0x5c ) * app.sim.currentAdcK / 32 + 0x80;
                     result = (x < 0) ? 0 : ( (x > 0xff) ? 0xff : (uint8_t)x);
                 }
                 app.adc.adc0 = result;
@@ -805,15 +889,6 @@ namespace u1_app {
             }
                 
             case 1: { // voltage
-        // if (app.adc.voltage.timer < 0xff) {
-        //     app.adc.voltage.timer++;
-        // }
-        // if (app.adc.voltage.timer < 2) {
-        //     u1_sys::setLedD3(1);
-        // } else if (app.adc.voltage.timer > 90) {
-        //     u1_sys::setLedD3(0);
-        // }
-
                 nextChannel = 0;
                 app.adc.adc1 = result;
                 app.adc.recentAdc1[app.adc.recentAdc1Index++] = result;
@@ -823,13 +898,13 @@ namespace u1_app {
                 
                 int8_t change = calcAdcVoltage_adc200us(result);
                 if (change > 0) {
-                    u1_sys::setK2(1);
+                    // u1_sys::setK2(1);
                     if (phAngX100us > 0x0f) {
                         app.adc.phAngX100us = 0;
                     }
                     phAngX100us = 0;
                 } else if (change < 0) {
-                    u1_sys::setK2(0);
+                    // u1_sys::setK2(0);
                     timerChannel2 = 0;
                 }
                 break;
@@ -857,7 +932,11 @@ namespace u1_app {
             case 8: { // temperature
                 app.adc.adc8 = result;                
                 int16_t x = result;
-                app.temp = 25 + (x - app.trim.tempOffs) * app.trim.tempK / 16;
+                int8_t temp = 25 + (x - app.trim.tempOffs) * app.trim.tempK / 16;
+                if (app.sim.t > 0) {
+                    temp = app.sim.t;
+                }
+                app.temp = temp;
                 nextChannel = 0;
                 break;
             }

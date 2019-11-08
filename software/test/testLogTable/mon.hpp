@@ -1,17 +1,12 @@
-#ifndef U1_MON_HPP_
-#define U1_MON_HPP_
+#ifndef MON_HPP_
+#define MON_HPP_
 
-#include "global.h"
+#define EEP_LOG_START 128
 
-#ifdef GLOBAL_MONITOR
-
-#include "sys.hpp"
-#include <avr/pgmspace.h>
 
 namespace u1_mon {
 
-    #define EEP_LOG_START 128
-    typedef uint8_t * plogtable_t;
+    typedef uint16_t plogtable_t;
 
     struct LogTime { // 32 Bit
         unsigned int sec: 6;
@@ -41,16 +36,7 @@ namespace u1_mon {
     };
 
     extern struct Mon mon;
-    extern const struct u1_sys::MonCmdInfo PMEMSTR_CMDS[] PROGMEM;
 
-    void init ();
-    void main ();
-    void clearTrim ();
-    void clearLogTable();
-    uint8_t getCmdCount ();
-    int8_t  printLineHeader (uint8_t lineIndex);
-    int8_t  printLine (uint8_t lineIndex, char keyPressed);
 }
 
-#endif // GLOBAL_MONITOR
-#endif // U1_MON_HPP_
+#endif // MON_HPP_

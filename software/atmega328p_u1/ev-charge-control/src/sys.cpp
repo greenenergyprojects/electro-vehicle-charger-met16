@@ -122,8 +122,8 @@ namespace u1_sys {
         
         // settings for ev-charger-met
         DDRC |= (1 << PC3); // LED D3 (PC3) - Life LED (green)
-        DDRC |= (1 << PC4); // LED D7 - K1 relais (LED blue)
-        DDRC |= (1 << PC5); // LED D2 - K2 SSR relais (LED red)
+        DDRC |= (1 << PC4); // LED D7 - K1 relais (LED blue) (Nano A4)
+        DDRC |= (1 << PC5); // LED D2 - K2 SSR relais (LED red) (Nano A5)
         DDRD &= ~(0x3c); // SW1 (rotary switch 0-9) PD2/PD3/PD4/PD5
         PORTD |= 0x3c;   // pull up on rotary switch
         

@@ -8,13 +8,12 @@
                 "/usr/lib/gcc/avr/**",
                 "${workspaceFolder}/src/**"
             ],
-            "defines": [ "__AVR_ATmega324P__" ],
+            "defines": [ "__AVR_ATmega328P__" ],
             "forcedInclude": [ "/usr/share/avr/include/stdio.h" ],
             "compilerPath": "/usr/bin/avr-gcc",
             "cStandard": "c11",
             "cppStandard": "c++17",
             "intelliSenseMode": "clang-x64",
-            "intelliSenseEngine": "default",
             "browse": {
                 "path": [
                     "${workspaceFolder}"

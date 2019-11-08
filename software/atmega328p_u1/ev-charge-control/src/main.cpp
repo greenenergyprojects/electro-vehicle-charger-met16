@@ -14,6 +14,7 @@
 
 #include "global.h"
 #include "sys.hpp"
+#include "mon.hpp"
 #include "app.hpp"
 
 // defines
@@ -34,6 +35,7 @@ int main () {
     wdt_disable();
     
     u1_sys::init();
+    u1_mon::init();
     u1_app::init();
     printf("%s %s %s %s", MAIN_WELCOME, MAIN_DATE, MAIN_TIME, MAIN_HELP);
     printf("\r\n");
@@ -54,6 +56,7 @@ int main () {
 
     while (1) {
         u1_sys::main();
+        u1_mon::main();
         u1_app::main();
     }
     return 0;
