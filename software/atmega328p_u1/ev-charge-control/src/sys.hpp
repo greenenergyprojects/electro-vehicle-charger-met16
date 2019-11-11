@@ -94,7 +94,7 @@ namespace u1_sys {
 
     struct MonCmdInfo {
         PGM_P pInfo;
-        int8_t (*pFunction)(uint8_t, char *[]);
+        int8_t (*pFunction)(uint8_t, const char *[]);
     };
 
 

@@ -10,13 +10,13 @@ namespace u1_mon {
 
     // declarations and definitions
 
-    int8_t cmd_info (uint8_t argc, char *argv[]);
-    int8_t cmd_test (uint8_t argc, char *argv[]);
-    int8_t cmd_set (uint8_t argc, char *argv[]);
-    int8_t cmd_pwm (uint8_t argc, char *argv[]);
-    int8_t cmd_eep (uint8_t argc, char *argv[]);
-    int8_t cmd_trim (uint8_t argc, char *argv[]);
-    int8_t cmd_log (uint8_t argc, char *argv[]);
+    int8_t cmd_info (uint8_t argc, const char **argv);
+    int8_t cmd_test (uint8_t argc, const char **argv);
+    int8_t cmd_set (uint8_t argc, const char **argv);
+    int8_t cmd_pwm (uint8_t argc, const char **argv);
+    int8_t cmd_eep (uint8_t argc, const char **argv);
+    int8_t cmd_trim (uint8_t argc, const char **argv);
+    int8_t cmd_log (uint8_t argc, const char **argv);
 
     const char LINE_WELCOME[] PROGMEM = "Line-Mode: CTRL-X, CTRL-Y, CTRL-C, Return  \n\r";
     const char PMEM_CMD_INFO[] PROGMEM = "info\0Application infos\0info";
@@ -25,7 +25,7 @@ namespace u1_mon {
     const char PMEM_CMD_PWM[] PROGMEM = "pwm\0set PWM duty cycle for CP/port\0pwm {0-100}";
     const char PMEM_CMD_EEP[] PROGMEM = "eep\0eeprom ...\0eep [c/r/w] [hex-address] [number|value]";
     const char PMEM_CMD_TRIM[] PROGMEM = "trim\0trim table\0trim [reset]";
-    const char PMEM_CMD_LOG[] PROGMEM = "log\0log\0log";
+    const char PMEM_CMD_LOG[] PROGMEM = "log\0log\0log [clear]";
 
     const char HEADER_1[] PROGMEM = "L1 |   Up-Time | A0 A1 A2 A6 A7 A8 |  Temp |   VCP |     CP | STATUS";
     const char HEADER_2[] PROGMEM = "L2 | Voltage\n   | +/- TH ADC MIN MAX VPP |  PERIOD |   FREQU |     VAC | ";
@@ -44,21 +44,14 @@ namespace u1_mon {
 
     // definitions and declarations
     struct Mon mon;
+    void startupLog ();
     
-    void clearLogTable ();
-    plogtable_t getNextLogRecord (plogtable_t p);
-    plogtable_t getLogLatestRecord ();
-    void saveLog ();
 
     // ------------------------------------------------------------------------
 
     void init () {
         memset((void *)&mon, 0, sizeof(mon));
-        uint8_t *p = (uint8_t *)EEP_LOG_START;
-        struct LogRecordHeader pHeader;
-        mon.log.pLatestRecord = getLogLatestRecord();
-        // printf("%u log records found\n", cnt);
-
+        // startupLog();
     }
 
     void main () {
@@ -73,17 +66,17 @@ namespace u1_mon {
     // Monitor commands of the application
     // --------------------------------------------------------
 
-    int8_t cmd_info (uint8_t argc, char *argv[]) {
+    int8_t cmd_info (uint8_t argc, const char **argv) {
         return 0;
     }
 
 
-    int8_t cmd_test (uint8_t argc, char *argv[]) {
+    int8_t cmd_test (uint8_t argc, const char **argv) {
         return 0;
     }
 
 
-    int8_t cmd_set (uint8_t argc, char *argv[]) {
+    int8_t cmd_set (uint8_t argc, const char **argv) {
         if (argc > 1 && argc < 4 && argv[1][1] == 0) {
             int v = 0;
             if (argc == 3) {
@@ -121,7 +114,7 @@ namespace u1_mon {
         return -10;
     }
 
-    int8_t cmd_pwm (uint8_t argc, char *argv[]) {
+    int8_t cmd_pwm (uint8_t argc, const char **argv) {
         if (argc != 2) { return -1; }
         int v;
         if (sscanf(argv[1], "%d", &v) != 1) { return -2; }
@@ -138,7 +131,7 @@ namespace u1_mon {
         return 0;
     }
 
-    int8_t cmd_eep (uint8_t argc, char *argv[]) {
+    int8_t cmd_eep (uint8_t argc, const char **argv) {
         uint8_t *pAddr = 0;
         uint16_t number = 32;
         char type = 'r';
@@ -200,7 +193,7 @@ namespace u1_mon {
         printf(" tempOffs: %d\n\n", p->tempOffs);
     }
 
-    int8_t cmd_trim (uint8_t argc, char *argv[]) {
+    int8_t cmd_trim (uint8_t argc, const char **argv) {
         if (argc == 2) {
             if (strcmp(argv[1], "clear") == 0) {
                 uint8_t *p = 0;
@@ -234,10 +227,199 @@ namespace u1_mon {
     }
     
 
-    int8_t cmd_log (uint8_t argc, char *argv[]) {
-        return -1;
+    // ***********************************************************************
+    // log functions
+    // ***********************************************************************
+
+    int16_t findLogDescriptorIndex (uint32_t time) {
+        int16_t rv = -1;
+        uint32_t rvTimeDiff = 0xffffffff;
+        uint8_t index = 0;
+        plogtable_t p = (plogtable_t)EEP_LOG_START + sizeof (struct LogDescriptor) * index;
+        struct LogDescriptor d;
+        while (index < EEP_LOG_DESCRIPTORS) {
+            eeprom_busy_wait();
+            eeprom_read_block(&d, p, sizeof (d));
+            if ((d.typ & 0x0f) != 0x0f) {
+                uint32_t diff = d.time > time ? d.time - time : time - d.time;  
+                if (diff < rvTimeDiff) {
+                    rvTimeDiff = diff;
+                    rv = index;
+                }
+            }
+            index++;
+            p += sizeof(struct LogDescriptor);
+        }
+        return rv;
     }
 
+    int16_t findNewestLogDescriptorIndex () {
+        return findLogDescriptorIndex(0xffffffff);
+    }
+
+    int16_t findOldestLogDescriptorIndex () {
+        return findLogDescriptorIndex(0);
+    }
+
+    uint8_t saveLog (uint8_t typ, void *pData, uint8_t size) {
+        if (typ >= 0x0f) { 
+            return 0xff; // error
+        }
+        struct LogDescriptor d;
+        d.typ = 0x0f;
+        pushSREGAndCli(); {
+            uint16_t tHigh = (u1_app::app.trim.startCnt << 1) | ((u1_app::app.clock.hrs >> 4) & 0x01);
+            uint16_t tLow = ((u1_app::app.clock.hrs & 0x0f) << 12) | ((u1_app::app.clock.min & 0x3f) << 6) | (u1_app::app.clock.sec & 0x3f);
+            d.time = (((uint32_t)tHigh) << 16) | tLow;
+        } popSREG();
+
+        uint8_t index = 0;
+        plogtable_t p = (plogtable_t)EEP_LOG_START;
+        plogtable_t pTo = (plogtable_t)EEP_LOG_SLOTS_START;
+        uint8_t lastTyp = typ;
+        if (mon.log.index < EEP_LOG_DESCRIPTORS) {
+            index = mon.log.index;
+            p += index * sizeof (struct LogDescriptor);
+            pTo += index * EEP_LOG_SLOT_SIZE;
+            lastTyp = mon.log.lastTyp == 0 ? 0xff : mon.log.lastTyp;
+        }
+        uint8_t rv;
+        int16_t bytes = size;
+        uint8_t slotCnt = 0;
+
+        do {    
+            if (lastTyp != typ || slotCnt > 0) {
+                index++;
+                p += sizeof (struct LogDescriptor);
+                pTo += EEP_LOG_SLOT_SIZE;
+                if (index >= EEP_LOG_DESCRIPTORS) { 
+                    p = (plogtable_t)EEP_LOG_START;
+                    pTo = (plogtable_t)EEP_LOG_SLOTS_START;
+                    index = 0;
+                }
+            }
+            if (slotCnt == 0) {
+                rv = index;
+            }
+            d.typ = (d.typ & 0x0f) | (slotCnt++ << 4);
+            eeprom_busy_wait();
+            eeprom_update_block(&d, p, sizeof(d));
+            uint8_t l = bytes < EEP_LOG_SLOT_SIZE ? bytes : EEP_LOG_SLOT_SIZE;
+            eeprom_busy_wait();
+            if (pData != NULL && size > 0) {
+                eeprom_update_block(pData, pTo, l);
+                
+                bytes -= EEP_LOG_SLOT_SIZE;
+                pData = ((uint8_t *)pData) + l;
+            }
+        } while (bytes > 0 && slotCnt < 16);
+
+        index = rv;
+        p = (plogtable_t)EEP_LOG_START + index * sizeof (struct LogDescriptor);
+        d.typ = typ;
+        uint8_t slot = 0;
+        while (slotCnt-- > 0) {
+            d.typ = (d.typ & 0x0f) | (slot << 4);
+            eeprom_busy_wait();
+            eeprom_write_byte(p, *((uint8_t *)&d));
+            p += sizeof (struct LogDescriptor);
+            mon.log.index = index++;
+            slot++;
+            if (index >= EEP_LOG_DESCRIPTORS) { 
+                p = (plogtable_t)EEP_LOG_START;
+                index = 0;
+            }
+        }
+        mon.log.lastTyp = typ;
+
+        return rv;
+    }
+
+    void startupLog () {
+        int16_t startIndex = findNewestLogDescriptorIndex();
+        mon.log.index = startIndex < 0 ? EEP_LOG_DESCRIPTORS : startIndex + 1;
+        if (mon.log.index >= EEP_LOG_DESCRIPTORS) {
+            mon.log.index = 0;
+        }
+        mon.log.lastTyp = 0xff;
+        saveLog(LOG_TYPE_SYSTEMSTART, NULL, 0);
+    }
+
+    int8_t cmd_log (uint8_t argc, const char **argv) {
+        if (argc == 2 && strcmp("clear", argv[1]) == 0) {
+            clearLogTable();
+            return 0;
+        }
+        if (argc > 1) { return -1; }
+
+        struct LogDescriptor d;
+        int16_t startIndex = findOldestLogDescriptorIndex();
+        uint8_t cnt = 0;
+        if (startIndex >= 0) {
+            uint8_t index = (uint8_t)startIndex;
+            plogtable_t p = (plogtable_t)EEP_LOG_START + sizeof (struct LogDescriptor) * index;
+            struct LogDescriptor d;
+            do {
+                eeprom_busy_wait();
+                eeprom_read_block(&d, p, sizeof (d));
+                if ((d.typ & 0x0f) != 0x0f) {
+                    cnt++;
+                    uint8_t typ = d.typ & 0x0f;
+                    uint8_t subIndex = d.typ >> 4;
+                    uint16_t startupCnt = d.time >> 17;
+                    uint8_t hrs = (d.time >> 12) & 0x1f;
+                    uint8_t min = (d.time >> 6) & 0x3f;
+                    uint8_t sec = d.time & 0x3f;
+                    printf("  %2d(%01x/%01x) %5d-%02d:%02d:%02d -> ", index, typ, subIndex, startupCnt, hrs, min, sec);
+                    uint8_t slot[EEP_LOG_SLOT_SIZE];
+                    eeprom_busy_wait();
+                    eeprom_read_block(&slot, (plogtable_t)EEP_LOG_SLOTS_START + index * EEP_LOG_SLOT_SIZE, sizeof (slot));
+                    switch (d.typ) {
+                        case LOG_TYPE_SYSTEMSTART: {
+                            printf("system start");
+                            break;
+                        }
+
+                        case LOG_TYPE_STARTCHARGE: {
+                            struct LogDataStartCharge *pData = (struct LogDataStartCharge *)&slot;
+                            printf("start charge maxAmps=%u", pData->maxAmps);
+                            break;
+                        }
+
+                        case LOG_TYPE_CHARGING: case LOG_TYPE_STOPCHARGING: {
+                            struct LogDataCharging *pData = (struct LogDataCharging *)&slot;
+                            uint8_t e = pData->energyKwhX256 >> 8;
+                            uint8_t nk = ((pData->energyKwhX256 & 0xff) * 100 + 128) / 256;
+                            if (d.typ == LOG_TYPE_STOPCHARGING) {
+                                printf("stop ");
+                            }
+                            printf("charge %u:%02u, E=%u.%02ukWh", pData->chgTimeHours, pData->chgTimeMinutes, e, nk);
+                            break;
+                        }
+
+                        default: {
+                            printf("? (");
+                            for (uint8_t i = 0; i < sizeof slot; i++) {
+                                printf(" %02x", slot[i]);
+                            }
+                            printf(")");
+                            break;
+                        }
+                    }
+                    printf("\n");
+                }
+                index++;
+                p += sizeof(struct LogDescriptor);
+                if (index >= EEP_LOG_DESCRIPTORS) {
+                    index = 0;
+                    p = (plogtable_t)EEP_LOG_START;
+                }
+            } while (index != startIndex);
+        }
+        printf("%d valid log records\n", cnt);
+
+        return 0;
+    }
 
     // --------------------------------------------------------
     // Monitor-Line for continues output
@@ -388,93 +570,8 @@ namespace u1_mon {
 
     void clearLogTable () {
         clearEEP((uint8_t *)EEP_LOG_START, E2END + 1 - EEP_LOG_START);
-        mon.log.pLatestRecord = 0;
-    }
-
-    plogtable_t getNextLogRecord (plogtable_t p) {
-        if (p == 0 || (uint16_t)p > E2END) {
-            // illegal argument p, clear all records and return start of table
-            clearLogTable();
-            return (plogtable_t)EEP_LOG_START;
-        } 
-        eeprom_busy_wait();
-        uint8_t rSize = eeprom_read_byte(p);
-        if (rSize == 0xff) {
-            return p;
-        } else if (rSize < sizeof (struct LogRecordHeader)) {
-            // failure in table, clear all records and return start of table
-            clearLogTable();
-            return (plogtable_t)EEP_LOG_START;
-        }
-        p = p + rSize;
-        if ((uint16_t)p > E2END) {
-            return (plogtable_t)EEP_LOG_START;
-        }
-        return p;
-    }
-
-    plogtable_t getLogLatestRecord () {
-        plogtable_t prv = (plogtable_t) EEP_LOG_START;
-        struct LogRecordHeader h; 
-        uint32_t timeLatest = 0;
-
-        plogtable_t p = (plogtable_t)EEP_LOG_START;
-        while (1) {
-            eeprom_busy_wait();
-            eeprom_read_block(&h, p, sizeof(struct LogRecordHeader));
-            if (h.size == 0xff) {
-                return (plogtable_t)NULL;
-            }
-            uint32_t t = *( (uint32_t *)&h.time );
-            if (t == 0 || h.size < sizeof(struct LogRecordHeader)) {
-                // failure in table, clear all records and return start of table
-                clearLogTable();
-                return (plogtable_t)NULL;
-            }
-            if (t > timeLatest)     {
-                timeLatest = t;
-                prv = p;
-            }
-            p = (plogtable_t)(p + h.size);
-            if ((uint16_t)p > E2END) {
-                return prv;
-            }
-        }
-    }
-
-    void saveLog (void *pData, uint8_t typ, uint8_t size) {
-        plogtable_t p;
-        if (mon.log.pLatestRecord == (plogtable_t)NULL) {
-            mon.log.pLatestRecord = getLogLatestRecord();
-        }
-        if (mon.log.pLatestRecord == (plogtable_t)NULL) {
-            p = (plogtable_t)EEP_LOG_START;
-        } else {
-            eeprom_busy_wait();
-            uint8_t lrSize = eeprom_read_byte(mon.log.pLatestRecord);
-            p = p + lrSize;
-            if ( ((uint16_t)p + sizeof(struct LogRecordHeader) + size) > E2END ) {
-                p = (plogtable_t)EEP_LOG_START;
-            }
-        }
-        
-        struct LogRecordHeader h;
-        h.size = size + sizeof(LogRecordHeader);
-        h.typ = 0;
-        h.time.systemStartCnt = u1_app::app.trim.startCnt;
-        cli();
-        h.time.sec = u1_app::app.clock.sec;
-        h.time.min = u1_app::app.clock.min;
-        h.time.hrs = u1_app::app.clock.hrs;
-        sei();
-        eeprom_busy_wait();
-        eeprom_update_block(&h, p, sizeof(h));
-        eeprom_busy_wait();
-        eeprom_update_block(pData, p + sizeof(h), size);
-        eeprom_busy_wait();
-        eeprom_write_byte((p + 1), typ);
-        eeprom_busy_wait();
-        mon.log.pLatestRecord = p;
+        mon.log.index = 0xff;
+        mon.log.lastTyp = 0x0f;
     }
 
 }

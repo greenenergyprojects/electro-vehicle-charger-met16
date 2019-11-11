@@ -17,6 +17,7 @@ namespace u1_app {
     void init () {
         memset(&app, 0, sizeof app);
         initTrim(1);
+        u1_mon::startupLog();
         // u1_mon::clearTrim();
         // u1_mon::clearLogTable();
         app.state = Init;
@@ -56,6 +57,42 @@ namespace u1_app {
         if (u1_sys::clearEvent(EVENT_REFRESH_LCD)) {
             app_refreshLcd();
         }
+        if (u1_sys::clearEvent(EVENT_LOG_STARTCHARGING)) {
+            struct u1_mon::LogDataStartCharge data = { app.maxAmps };
+            u1_mon::saveLog(LOG_TYPE_STARTCHARGE, &data, sizeof (data));
+        }
+        if (u1_sys::clearEvent(EVENT_LOG_CHARGING)) {
+            u1_mon::saveLog(LOG_TYPE_CHARGING, &app.logDataCharging, sizeof (app.logDataCharging));
+        }
+        if (u1_sys::clearEvent(EVENT_LOG_STOPCHARGING)) {
+            u1_mon::saveLog(LOG_TYPE_STOPCHARGING, &app.logDataCharging, sizeof (app.logDataCharging));
+        }
+    }
+
+    void incClockMs (struct Clock *p) {
+        if (p->ms < 999) {
+            p->ms++;
+        } else {
+            p->ms = 0;
+            if (p->sec < 59) {
+                p->sec++;
+            } else {
+               p->sec = 0;
+                if (p->min < 59) {
+                    p->min++;
+                } else {
+                    p->min = 0;
+                    if (p->hrs < 0xff) {
+                        p->hrs++;
+                    } else {
+                        p->hrs++;
+                        p->min = 59;
+                        p->sec = 59;
+                        p->ms = 999;
+                    }
+                }
+            }
+        } 
     }
 
     void calcPower () {
@@ -277,30 +314,8 @@ namespace u1_app {
 
 
     void task_1ms () {
-
-        if (app.clock.ms < 999) {
-            app.clock.ms++;
-        } else {
-            app.clock.ms = 0;
-            if (app.clock.sec < 59) {
-                app.clock.sec++;
-            } else {
-                app.clock.sec = 0;
-                if (app.clock.min < 59) {
-                    app.clock.min++;
-                } else {
-                    app.clock.min = 0;
-                    if (app.clock.hrs < 0xff) {
-                        app.clock.hrs++;
-                    } else {
-                        app.clock.hrs++;
-                        app.clock.min = 59;
-                        app.clock.sec = 59;
-                        app.clock.ms = 999;
-                    }
-                }
-            }
-        } 
+        static struct Clock chgTime;
+        incClockMs(&app.clock);
 
         static uint16_t timer = 0;
         if (timer > 0) {
@@ -438,7 +453,6 @@ namespace u1_app {
                     if (timer == 0) {
                         u1_sys::setK1(1);
                         timer =  500;
-                        app.chgTimeSeconds = 0;
                         nextState = Charging;
                     }
                 } else {
@@ -451,12 +465,6 @@ namespace u1_app {
             }
             
             case Charging: {
-                static uint16_t timerChgSeconds = 0;
-                timerChgSeconds++;
-                if (timerChgSeconds >= 1000) {
-                    timerChgSeconds = 0;
-                    app.chgTimeSeconds = (app.chgTimeSeconds < 0xffff) ? app.chgTimeSeconds + 1 : 0xffff;
-                }
                 u1_sys::enablePWM(1);
                 OCR0A = pwmOC;
                 if (app.vcpX16 >= (100 * 16 / 10)) { // 10.5V
@@ -483,6 +491,16 @@ namespace u1_app {
                         nextState = Init; // error
                     }
                 }
+
+                incClockMs(&chgTime);
+                app.logDataCharging.chgTimeHours = chgTime.hrs;
+                app.logDataCharging.chgTimeMinutes = chgTime.min;
+                app.logDataCharging.energyKwhX256 = app.energyKwhX256;
+                if (nextState != Charging) {
+                    u1_sys::setEvent(EVENT_LOG_STOPCHARGING);
+                } else if (chgTime.ms == 0 && chgTime.sec == 0 && (chgTime.min) % 4 == 1) {
+                    u1_sys::setEvent(EVENT_LOG_CHARGING);
+                }
                 break;
             }
             
@@ -492,7 +510,16 @@ namespace u1_app {
                 break;
             }
         }
-        app.state = nextState;
+
+        if (app.state != nextState) {
+            if (nextState == Charging) {
+                app.energyKwhX256 = 0;
+                memset(&chgTime, sizeof (chgTime), 0);
+                u1_sys::setEvent(EVENT_LOG_STARTCHARGING);
+            }
+            app.state = nextState;
+        }
+
     }
 
     void task_2ms () {

@@ -30,10 +30,10 @@ namespace u1_sys {
         struct Monitor mon;
 
         void mon_main ();
-        int8_t cmd_help (uint8_t argc, char *argv[]);
-        int8_t cmd_sinfo (uint8_t argc, char *argv[]);
-        int8_t cmd_hexdump (uint8_t argc, char *argv[]);
-        int8_t cmd_setmem (uint8_t argc, char *argv[]);
+        int8_t cmd_help (uint8_t argc, const char **argv);
+        int8_t cmd_sinfo (uint8_t argc, const char **argv);
+        int8_t cmd_hexdump (uint8_t argc, const char **argv);
+        int8_t cmd_setmem (uint8_t argc, const char **argv);
 
         // globale Konstante im Flash
         const char PMEM_LINESTART[] PROGMEM = "\n\r>";
@@ -632,7 +632,7 @@ namespace u1_sys {
                     if (argc == 2 && strcmp_P(argv[1], PMEM_CMD_HELP) == 0) {
                         mon_printUsageInfo(&ci);
                     } else {
-                        int8_t retCode = (*ci.pFunction)(argc, argv);
+                        int8_t retCode = (*ci.pFunction)(argc, (const char **)argv);
                         if (retCode) {
                             printString_P(PMEM_ERR0);
                             printf("%d", retCode);
@@ -767,7 +767,7 @@ namespace u1_sys {
     // Monitor Commands
     // ****************************************************************************
 
-    int8_t cmd_help (uint8_t argc, char *argv[]) {
+    int8_t cmd_help (uint8_t argc, const char **const argv) {
         // struct Monitor *pmon = (struct Monitor *)&mon;
         uint8_t i, j, max;
 
@@ -798,7 +798,7 @@ namespace u1_sys {
         return 0;
     }
 
-    int8_t cmd_sinfo (uint8_t argc, char *argv[]) {
+    int8_t cmd_sinfo (uint8_t argc, const char **argv) {
         printf("sys.errcnt.task: ");
         printHexBin8(sys.errcnt.task);
         newline();
@@ -806,7 +806,7 @@ namespace u1_sys {
     }
 
     #ifdef GLOBAL_MONITOR_CMD_SETMEM
-    int8_t cmd_setmem (uint8_t argc, char *argv[]) {
+    int8_t cmd_setmem (uint8_t argc, const char **argv) {
         char     typ;    // 1st parameter (s='SRAM | 'e'=EEPROM)
         uint16_t add;    // 2nd parameter (address)
         uint16_t value;  // 3rd parameter (value)
@@ -851,7 +851,7 @@ namespace u1_sys {
 
 
     #ifdef GLOBAL_MONITOR_CMD_HEXDUMP
-    int8_t cmd_hexdump (uint8_t argc, char *argv[]) {
+    int8_t cmd_hexdump (uint8_t argc, const char **argv) {
         if (argc < 3 || argc > 4) {
             return -1;
         }

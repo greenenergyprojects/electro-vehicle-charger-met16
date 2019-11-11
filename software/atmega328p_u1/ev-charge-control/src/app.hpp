@@ -14,14 +14,14 @@
 
 namespace u1_app {
 
-    #define EVENT_REFRESH_LCD    0x01
-    #define EVENT_1              0x02
-    #define EVENT_2              0x04
-    #define EVENT_3              0x08
-    #define EVENT_4              0x10
-    #define EVENT_5              0x20
-    #define EVENT_6              0x40
-    #define EVENT_7              0x80
+    #define EVENT_REFRESH_LCD       0x01
+    #define EVENT_LOG_STARTCHARGING 0x02
+    #define EVENT_LOG_CHARGING      0x04
+    #define EVENT_LOG_STOPCHARGING  0x08
+    #define EVENT_4                 0x10
+    #define EVENT_5                 0x20
+    #define EVENT_6                 0x40
+    #define EVENT_7                 0x80
 
     enum State { Init, Test, Start, NotConnected, Connected, EVReady, Charging };
 
@@ -113,6 +113,7 @@ namespace u1_app {
         union Debug debug;
         struct Trim trim;
         struct Adc adc;
+        struct u1_mon::LogDataCharging logDataCharging;
         uint8_t disableStatusLED;
         uint8_t maxAmps;
         uint8_t vcpX16;
@@ -125,7 +126,6 @@ namespace u1_app {
         uint8_t protection;
         int8_t  temp;
         uint32_t energyKwhX256;
-        uint32_t chgTimeSeconds;
     };
 
 
