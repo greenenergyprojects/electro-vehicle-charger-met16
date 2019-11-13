@@ -8,18 +8,12 @@
 * Optional: voltage and current measurement on board
 * Optional: LCD connector (2x20 characters, 4 bit mode)
 
-## History
+## Newest version ready to use
 
-### Version v0.3: Second prototype
+* [Branch v0.3](https://github.com/greenenergyprojects/electro-vehicle-charger-met16/tree/v0.3)
+* PCB: [kicad/dist](kicad/dist)
+* Software: [software/atmega328p_u1/ev-charge-control/released](software/atmega328p_u1/ev-charge-control/released)
 
-----------------------------------------------
- Topic          | Description
- :----          | :-----------
- Commit/Tag     | v0.3
- Date           | 2019-10-30
- Status         | Under Test
- Manufactured   | Yes
- Tested         | No
- Print          | [kicad/README.md](kicad/README.md)
- Software       | [software/default_atmega328p/README.md](software/default_atmega328p/README.md)
+See README.md files in subfolders for more information.
 
+![](ev-charger-m16.jpg)
