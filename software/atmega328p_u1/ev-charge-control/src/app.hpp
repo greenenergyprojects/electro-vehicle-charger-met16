@@ -14,6 +14,8 @@
 
 namespace u1_app {
 
+    #define LOG_HISTORY_SIZE 4
+
     #define EVENT_REFRESH_LCD       0x01
     #define EVENT_LOG_STARTCHARGING 0x02
     #define EVENT_LOG_CHARGING      0x04
@@ -106,6 +108,12 @@ namespace u1_app {
         int t;
     };
 
+    struct LogChargingHistory {
+        uint8_t typ;
+        uint32_t time;
+        struct u1_mon::LogDataCharging data;
+    };
+
     struct App {
         enum State state;
         struct Sim sim;
@@ -114,6 +122,7 @@ namespace u1_app {
         struct Trim trim;
         struct Adc adc;
         struct u1_mon::LogDataCharging logDataCharging;
+        struct LogChargingHistory logChargingHistory[LOG_HISTORY_SIZE];
         uint8_t disableStatusLED;
         uint8_t maxAmps;
         uint8_t vcpX16;
@@ -144,6 +153,8 @@ namespace u1_app {
     void task_64ms  ();
     void task_128ms ();
 
+    void clearLogHistory ();
+    void addLogCharging (uint8_t typ, uint32_t time, uint8_t logIndex);
     uint8_t handleADCValue_adc100us (uint8_t channel, uint8_t result);
 
 }

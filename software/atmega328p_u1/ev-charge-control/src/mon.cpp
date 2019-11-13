@@ -232,6 +232,8 @@ namespace u1_mon {
     // ***********************************************************************
 
     int16_t findLogDescriptorIndex (uint32_t time) {
+
+        u1_app::clearLogHistory();
         int16_t rv = -1;
         uint32_t rvTimeDiff = 0xffffffff;
         uint8_t index = 0;
@@ -240,12 +242,14 @@ namespace u1_mon {
         while (index < EEP_LOG_DESCRIPTORS) {
             eeprom_busy_wait();
             eeprom_read_block(&d, p, sizeof (d));
-            if ((d.typ & 0x0f) != 0x0f) {
+            uint8_t typ = d.typ & 0x0f;
+            if (typ != 0x0f) {
                 uint32_t diff = d.time > time ? d.time - time : time - d.time;  
                 if (diff < rvTimeDiff) {
                     rvTimeDiff = diff;
                     rv = index;
                 }
+                u1_app::addLogCharging(typ, d.time, index);
             }
             index++;
             p += sizeof(struct LogDescriptor);
@@ -331,8 +335,18 @@ namespace u1_mon {
             }
         }
         mon.log.lastTyp = typ;
+        u1_app::addLogCharging(typ, d.time, rv);
 
         return rv;
+    }
+
+    void readLogData (uint8_t index, uint8_t *pDest, uint8_t destSize) {
+        if (index >= EEP_LOG_DESCRIPTORS) {
+            return;
+        }
+        eeprom_busy_wait();
+        plogtable_t pFrom = (plogtable_t)EEP_LOG_SLOTS_START + EEP_LOG_SLOT_SIZE * index;
+        eeprom_read_block(pDest, pFrom, destSize);
     }
 
     void startupLog () {
@@ -417,6 +431,16 @@ namespace u1_mon {
             } while (index != startIndex);
         }
         printf("%d valid log records\n", cnt);
+
+        printf("\nLog history:\n");
+        for (uint8_t i = 0; i < (sizeof (u1_app::app.logChargingHistory) / sizeof (u1_app::app.logChargingHistory[0])); i++) {
+            struct u1_app::LogChargingHistory *p= &(u1_app::app.logChargingHistory[i]);
+            printf("  %u: typ=%u  time=%04x%04x ", i, p->typ, (uint16_t)(p->time >> 16), (uint16_t)(p->time));
+            printf("= %u-%u:%02u:%02u -> ", (uint16_t)(p->time >> 17), (uint16_t)((p->time >> 12) & 0x1f), (uint16_t)((p->time >> 6) & 0x3f), (uint16_t)(p->time & 0x3f));
+            printf("  %u:%02umin", p->data.chgTimeHours, p->data.chgTimeMinutes);
+            printf("  %u.%02ukWh", p->data.energyKwhX256 >> 8, ((p->data.energyKwhX256 & 0xff) * 100 + 128) / 256);
+            printf("\n");
+        }
 
         return 0;
     }
@@ -556,7 +580,7 @@ namespace u1_mon {
     // Log functions
     // --------------------------------------------------------
 
-    void clearEEP (uint8_t *pStartAddr, uint16_t size) {
+    void clearEEP (plogtable_t pStartAddr, uint16_t size) {
         while (size-- > 0 && (uint16_t)pStartAddr <= E2END) {
             eeprom_busy_wait();
             eeprom_write_byte(pStartAddr++, 0xff);
@@ -569,7 +593,7 @@ namespace u1_mon {
     }
 
     void clearLogTable () {
-        clearEEP((uint8_t *)EEP_LOG_START, E2END + 1 - EEP_LOG_START);
+        clearEEP((plogtable_t)EEP_LOG_START, E2END + 1 - EEP_LOG_START);
         mon.log.index = 0xff;
         mon.log.lastTyp = 0x0f;
     }

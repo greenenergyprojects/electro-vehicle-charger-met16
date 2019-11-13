@@ -8,13 +8,14 @@
 #include "sys.hpp"
 #include <avr/pgmspace.h>
 
-namespace u1_mon {
-    typedef uint8_t * plogtable_t;
-
     #define EEP_LOG_START 256
     #define EEP_LOG_DESCRIPTORS 64
     #define EEP_LOG_SLOT_SIZE ((E2END + 1 - EEP_LOG_START - EEP_LOG_DESCRIPTORS * 5) / EEP_LOG_DESCRIPTORS)
-    #define EEP_LOG_SLOTS_START (EEP_LOG_START + EEP_LOG_DESCRIPTORS * sizeof(LogDescriptor))
+    #define EEP_LOG_SLOTS_START (EEP_LOG_START + EEP_LOG_DESCRIPTORS * sizeof(struct u1_mon::LogDescriptor))
+
+    #if EEP_LOG_SLOT_SIZE < 6
+        #error log table too large
+    #endif
 
     #define LOG_TYPE_SYSTEMSTART   0
     #define LOG_TYPE_STARTCHARGE   1
@@ -22,10 +23,8 @@ namespace u1_mon {
     #define LOG_TYPE_STOPCHARGING  3
     #define LOG_TYPE_INVALID      15
 
-    #if EEP_LOG_SLOT_SIZE < 6
-        #error log table too large
-    #endif
-
+namespace u1_mon {
+    typedef uint8_t * plogtable_t;
 
     struct LogDescriptor {
         uint8_t typ;     // Bit 7:4=subindex, Bit 3:0=typ (0x0f = invalid descriptor, 0x00=startup system)
@@ -40,7 +39,7 @@ namespace u1_mon {
         uint8_t chgTimeHours;
         uint8_t chgTimeMinutes;
         uint16_t energyKwhX256;
-    };;
+    };
 
     struct Log {
         uint8_t index;
@@ -60,6 +59,7 @@ namespace u1_mon {
     void clearLogTable();
     void startupLog ();
     uint8_t saveLog (uint8_t typ, void *pData, uint8_t size);
+    void readLogData (uint8_t index, uint8_t *pDest, uint8_t destSize);
     uint8_t getCmdCount ();
     int8_t  printLineHeader (uint8_t lineIndex);
     int8_t  printLine (uint8_t lineIndex, char keyPressed);

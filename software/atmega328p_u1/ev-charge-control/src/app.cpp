@@ -95,6 +95,26 @@ namespace u1_app {
         } 
     }
 
+    void clearLogHistory () {
+        memset(app.logChargingHistory, 0, sizeof (app.logChargingHistory));
+    }
+
+    void addLogCharging (uint8_t typ, uint32_t time, uint8_t logIndex) {
+        static uint8_t index = 0;
+        if (typ != LOG_TYPE_STOPCHARGING) {
+            return;
+        }
+        struct u1_app::LogChargingHistory *px = &u1_app::app.logChargingHistory[index];
+        px->typ = typ;
+        px->time = time;
+        u1_mon::readLogData(logIndex, (uint8_t*)&px->data, sizeof(px->data));
+        index++;
+        if (index >= (sizeof(app.logChargingHistory) / sizeof(app.logChargingHistory[0]))) {
+            index = 0;
+        }
+
+    }
+
     void calcPower () {
         pushSREGAndCli();
         volatile uint8_t vac = (uint8_t)((app.vphX256 + 128) / 256);
@@ -159,8 +179,11 @@ namespace u1_app {
 
 
     void app_refreshLcd () { // called from main, 6ms
-        static uint8_t timer = 0;;
+        static uint8_t timer = 0;
         char s[21];    
+
+        timer = timer < 15 ? timer + 1 : 0;
+        
         u1_sys::lcd_setCursorPosition(0, 0);
         {
             
@@ -187,68 +210,133 @@ namespace u1_app {
         // snprintf(s, sizeof(s), "%d.%02dkWh", d.quot, d.rem / 10);    
         
         u1_sys::lcd_setCursorPosition(1, 0);
-        uint16_t currX256 = u1_app::app.currX256 + 13; // 0.05*256 = 12.8 -> 13
-        snprintf(s, sizeof(s), "%2d.%1dA ", (currX256 / 256), ((currX256 & 0xff) * 10) / 256);
-        u1_sys::lcd_putString(s);   
-        timer = timer < 15 ? timer + 1 : 0;
-        int8_t size = 14;
-        switch (timer / 4) {
-            case 0: {
-                struct u1_app::AdcVoltage *p = &(u1_app::app.adc.voltage);
-                uint16_t vphX256 = u1_app::app.vphX256 + 128; // 0.5*256 = 128
-                uint16_t frequX256 = u1_app::app.frequX256 + 13; // 0.05*256 = 12.8 -> 13
-                snprintf(s, sizeof(s), "%4dV %2d.%1dHz",
-                    vphX256 / 256,
-                    (frequX256 / 256), ((frequX256 & 0xff) * 10) / 256
-                );
-                break;
+        int8_t size;
+        
+        if (app.state == NotConnected) {
+            static uint8_t historyIndex = 0;
+            size = 20;
+            
+            uint8_t histSorted[LOG_HISTORY_SIZE];
+            for (uint8_t i = 0 ; i < LOG_HISTORY_SIZE; i++) {
+                histSorted[i] = i;
+            }
+            for (uint8_t i = 0; i < (LOG_HISTORY_SIZE - 1); i++) {
+                for (uint8_t j = 0; j < (LOG_HISTORY_SIZE - i - 1); j++) {
+                    struct LogChargingHistory *p1 = &app.logChargingHistory[histSorted[j]];
+                    struct LogChargingHistory *p2 = &app.logChargingHistory[histSorted[j + 1]];
+                    uint8_t swap = 0;
+                    if (p1->typ != LOG_TYPE_STOPCHARGING || p1->time == 0) {
+                        swap = 1;
+                    } else if (p2->typ != LOG_TYPE_STOPCHARGING || p2->time == 0) {
+
+                    } else if (p1->time < p2->time) {
+                        swap = 1;
+                    }
+                    if (swap) {
+                        uint8_t tmp = histSorted[j];
+                        histSorted[j] = histSorted[j + 1];
+                        histSorted[j + 1] = tmp;
+                    }
+                }
+            }
+            if (historyIndex > 0) {
+                struct LogChargingHistory *p = &app.logChargingHistory[histSorted[historyIndex - 1]];
+                // snprintf(s, sizeof s, "%u", historyIndex );
+                // snprintf(s, sizeof s, "%u", histSorted[historyIndex - 1] );
+                s[0] = 0;
+                if (p->typ != LOG_TYPE_STOPCHARGING || p->time == 0) {
+                    historyIndex = 0;
+                } else {
+                    uint8_t l;
+                    char s2[4];
+                    snprintf(s2, sizeof s2, "%u", historyIndex );
+                    u1_sys::lcd_putString(s2);
+                    u1_sys::lcd_putString(" -> ");
+                    // snprintf(s, sizeof(s), "%u-%u:%02u ", p->time >> 17, (p->time >> 12) & 0x1f, (p->time >> 6) & 0x3f); 
+                    l = strlen(s);
+                    snprintf(&s[l], sizeof(s) - l, "%2u:%02u ", p->data.chgTimeHours, p->data.chgTimeMinutes);
+                    l = strlen(s);
+                    snprintf(&s[l], sizeof(s) - l, "%2u.%02ukWh", (p->data.energyKwhX256 >> 8), ((p->data.energyKwhX256 & 0xff) * 100 + 128) / 256);
+                    s[20] = 0;
+                    size = 20 - strlen(s2) - 4;
+                }
+            }
+            if (historyIndex == 0) {
+                u1_sys::lcd_putString("Start"); size = 15; s[0] = 0;
+            }
+            if ((timer % 2) == 0) {
+                historyIndex = historyIndex >= LOG_HISTORY_SIZE ? 0 : historyIndex + 1;
+
             }
 
-            case 1: {
-                int16_t appPower = u1_app::app.apparantPower;
-                int16_t p = u1_app::app.activePower;
-                snprintf(s, sizeof(s), "%4dVA %5dW", appPower, p);
-                break;
-            }
-            
-            case 2: {
-                // div_t d = div((int)app.energy, 1000);
-                // snprintf(s, sizeof(s), "%d.%02dkWh", d.quot, d.rem / 10);
-                cli();
-                uint32_t e = app.energyKwhX256;
-                sei();
-                snprintf(s, sizeof(s), "%ld.%02dkWh", e / 256, ((uint8_t)e * 100 / 256));
-                break;
-            }
-            
-            case 3: {
-                char sim[6] = "-----";
-                if (app.sim.currentAdcK > 0) {
-                    sim[0] = 'S';
+        } else {
+            uint16_t currX256 = u1_app::app.currX256 + 13; // 0.05*256 = 12.8 -> 13
+            snprintf(s, sizeof(s), "%2d.%1dA ", (currX256 / 256), ((currX256 & 0xff) * 10) / 256);
+            size = 14;
+        
+            switch (timer / 4) {
+                case 0: {
+                    u1_sys::lcd_putString(s);   
+                    struct u1_app::AdcVoltage *p = &(u1_app::app.adc.voltage);
+                    uint16_t vphX256 = u1_app::app.vphX256 + 128; // 0.5*256 = 128
+                    uint16_t frequX256 = u1_app::app.frequX256 + 13; // 0.05*256 = 12.8 -> 13
+                    snprintf(s, sizeof(s), "%4dV %2d.%1dHz",
+                        vphX256 / 256,
+                        (frequX256 / 256), ((frequX256 & 0xff) * 10) / 256
+                    );
+                    break;
                 }
-                if (app.sim.f > 0) {
-                    sim[1] = 'f';
-                }
-                if (app.sim.v > 0) {
-                    sim[2] = 'v';
-                }
-                if (app.sim.t > 0) {
-                    sim[3] = 't';
-                }
-                if (app.sim.i > 0) {
-                    sim[4] = 'i';
-                }
-                u1_sys::lcd_putString(sim);
-                size = size - 5;
-                snprintf(s, sizeof(s), "%d:%02d:%02d", app.clock.hrs, app.clock.min, app.clock.sec);
-                break;
-            }
 
+                case 1: {
+                    u1_sys::lcd_putString(s);   
+                    int16_t appPower = u1_app::app.apparantPower;
+                    int16_t p = u1_app::app.activePower;
+                    snprintf(s, sizeof(s), "%4dVA %5dW", appPower, p);
+                    break;
+                }
+                
+                case 2: {
+                    // div_t d = div((int)app.energy, 1000);
+                    // snprintf(s, sizeof(s), "%d.%02dkWh", d.quot, d.rem / 10);
+                    u1_sys::lcd_putString(s);   
+                    cli();
+                    uint32_t e = app.energyKwhX256;
+                    sei();
+                    snprintf(s, sizeof(s), "%ld.%02dkWh", e / 256, ((uint8_t)e * 100 / 256));
+                    break;
+                }
+                
+                case 3: {
+                    u1_sys::lcd_putString(s);   
+                    char sim[6] = "-----";
+                    if (app.sim.currentAdcK > 0) {
+                        sim[0] = 'S';
+                    }
+                    if (app.sim.f > 0) {
+                        sim[1] = 'f';
+                    }
+                    if (app.sim.v > 0) {
+                        sim[2] = 'v';
+                    }
+                    if (app.sim.t > 0) {
+                        sim[3] = 't';
+                    }
+                    if (app.sim.i > 0) {
+                        sim[4] = 'i';
+                    }
+                    u1_sys::lcd_putString(sim);
+                    size = size - 5;
+                    snprintf(s, sizeof(s), "%d:%02d:%02d", app.clock.hrs, app.clock.min, app.clock.sec);
+                    break;
+                }
+
+            }
         }
         for (uint8_t i = 0; i < size - strlen(s); i++) {
             u1_sys::lcd_putchar(' ');
         }
-        u1_sys::lcd_putString(s);   
+        u1_sys::lcd_putString(s);
+
     }
 
     uint8_t calcVcpEwma (uint8_t value) {
@@ -514,7 +602,7 @@ namespace u1_app {
         if (app.state != nextState) {
             if (nextState == Charging) {
                 app.energyKwhX256 = 0;
-                memset(&chgTime, sizeof (chgTime), 0);
+                memset(&chgTime, 0, sizeof (chgTime));
                 u1_sys::setEvent(EVENT_LOG_STARTCHARGING);
             }
             app.state = nextState;
