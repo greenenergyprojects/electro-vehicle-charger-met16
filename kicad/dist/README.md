@@ -20,6 +20,7 @@ See [https://support.jlcpcb.com/article/44-how-to-export-kicad-pcb-to-gerber-fil
 | C9             | 100n -> 1n                                                                    |
 | U4             | Change Text ACS712 -> ACS712-30A 2.5V|66mV/A (or ACS712-20A 2.5V|100mV/A)     |
 | R7             | Change 10K -> 5K6 or Trimmer 10K instead of R4,R7 (voltage offset adjustment) |
+| LCD drills     | increase horizontal distance app. 0.5mm                                       |
 
 
 ## Test results
